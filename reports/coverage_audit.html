@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>CPCA 历史数据覆盖率审计</title>
+<style>
+    :root {
+      --blue: #174A7C;
+      --deep-blue: #06213D;
+      --cyan: #7ECDEB;
+      --light-blue: #DDEFF8;
+      --cream: #FFF9EF;
+      --gold: #D79A36;
+      --brown: #7A4A24;
+      --text: #1F2D3D;
+      --muted: #6B7C8F;
+      --card: #FFFFFF;
+      --line: #E6EEF5;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--cream);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+        "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrap { max-width: 1180px; margin: 0 auto; padding: 34px 24px 46px; }
+    header {
+      display: flex; justify-content: space-between; align-items: flex-end;
+      gap: 24px; padding-bottom: 18px; border-bottom: 2px solid var(--blue);
+    }
+    .eyebrow {
+      color: var(--gold); font-size: 12px; font-weight: 700;
+      letter-spacing: .14em; text-transform: uppercase; margin-bottom: 7px;
+    }
+    h1 { margin: 0; color: var(--blue); font-size: 31px; line-height: 1.2; }
+    .subtitle { margin: 8px 0 0; color: var(--muted); font-size: 14px; }
+    .meta { color: var(--muted); font-size: 12px; text-align: right; line-height: 1.8; }
+    .meta strong { color: var(--deep-blue); }
+    .lede {
+      margin: 22px 0 0; color: var(--text); font-size: 14px; line-height: 1.85;
+      max-width: 930px;
+    }
+    .cards {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+      margin: 24px 0 8px;
+    }
+    .card {
+      background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+      padding: 16px 18px 15px; box-shadow: 0 4px 18px rgba(23, 74, 124, .045);
+    }
+    .card.accent { border-color: rgba(215, 154, 54, .35); }
+    .card-label { color: var(--muted); font-size: 12px; letter-spacing: .03em; }
+    .card-value {
+      color: var(--blue); font-size: 27px; font-weight: 700; line-height: 1.2;
+      margin-top: 5px; font-variant-numeric: tabular-nums;
+    }
+    .card.accent .card-value { color: var(--brown); }
+    .card-sub { color: var(--muted); font-size: 12px; margin-top: 4px; }
+    section { margin-top: 30px; }
+    h2 { color: var(--blue); font-size: 20px; margin: 0 0 6px; }
+    h3 { color: var(--deep-blue); font-size: 15px; margin: 22px 0 8px; }
+    .section-note { color: var(--muted); font-size: 12px; line-height: 1.75; margin: 0 0 11px; }
+    .table-wrap {
+      overflow-x: auto; background: var(--card); border: 1px solid var(--line);
+      border-radius: 12px; box-shadow: 0 3px 14px rgba(23, 74, 124, .035);
+    }
+    table { width: 100%; border-collapse: collapse; min-width: 780px; }
+    th {
+      background: var(--light-blue); color: var(--deep-blue); text-align: left;
+      font-size: 11.5px; font-weight: 700; padding: 10px 10px; line-height: 1.35;
+      white-space: nowrap;
+    }
+    td {
+      border-top: 1px solid #EEF4F9; padding: 10px 10px; font-size: 12.5px;
+      vertical-align: top; line-height: 1.55;
+    }
+    tr:nth-child(even) td { background: #FBFDFF; }
+    tr.total td { background: #F3F9FD; font-weight: 700; color: var(--deep-blue); }
+    .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .calendar { min-width: 105px; font-variant-numeric: tabular-nums; }
+    .muted { color: var(--muted); }
+    .pill {
+      display: inline-block; padding: 2px 8px; border-radius: 999px;
+      background: var(--light-blue); color: var(--blue); font-size: 11.5px;
+      font-weight: 600; white-space: nowrap;
+    }
+    .gap-tag {
+      display: inline-block; padding: 2px 7px; border-radius: 6px;
+      background: var(--cream); color: var(--brown); border: 1px solid rgba(215, 154, 54, .25);
+      font-size: 11.5px; white-space: nowrap;
+    }
+    .bar {
+      height: 5px; width: 100%; background: #EAF2F8; border-radius: 999px;
+      overflow: hidden; margin-top: 5px; min-width: 80px;
+    }
+    .bar span {
+      display: block; height: 100%; border-radius: 999px;
+      background: linear-gradient(90deg, var(--cyan), var(--blue));
+    }
+    ul.notes { margin: 6px 0 0; padding-left: 20px; color: var(--muted); font-size: 12.5px; line-height: 1.8; }
+    ul.notes strong { color: var(--text); }
+    footer {
+      margin-top: 34px; padding-top: 15px; border-top: 1px solid var(--line);
+      color: var(--muted); font-size: 11.5px; line-height: 1.8;
+    }
+    @media (max-width: 900px) {
+      .wrap { padding: 24px 16px 36px; }
+      header { display: block; }
+      .meta { text-align: left; margin-top: 12px; }
+      .cards { grid-template-columns: repeat(2, 1fr); }
+      h1 { font-size: 25px; }
+    }
+    @media (max-width: 560px) {
+      .cards { grid-template-columns: 1fr; }
+    }
+    </style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div>
+    <div class="eyebrow">CPCA · 数据资产审计</div>
+    <h1>历史数据覆盖率审计</h1>
+    <p class="subtitle">2020–2026 · 周度区间、月度收盘与指标可用性</p>
+  </div>
+  <div class="meta">审计截止 <strong>2026-10-18</strong><br>生成日期 2026-10-22</div>
+</header>
+
+<p class="lede">
+所有已解析区间中，乘用车零售覆盖 232/232，
+新能源零售覆盖 180/232。2022–2026 已发生的 58 个月中，
+58 个月至少有乘用车零售区间，46 个月至少有新能源零售区间；
+若要求完整月度收盘，则分别为 44 和 42 个月。
+2020–2021 目前只有原始 HTML，没有结构化数据。
+</p>
+
+<section>
+  <div class="cards"><div class="card"><div class="card-label">原始归档</div><div class="card-value">332</div><div class="card-sub">2020–2026 全部层级</div></div><div class="card"><div class="card-label">已解析区间</div><div class="card-value">232</div><div class="card-sub">188 周度 · 44 月度</div></div><div class="card"><div class="card-label">乘用车零售</div><div class="card-value">232/232</div><div class="card-sub">100.0% 已解析区间有值</div></div><div class="card accent"><div class="card-label">新能源零售</div><div class="card-value">180/232</div><div class="card-sub">77.6% 已解析区间有值</div></div><div class="card"><div class="card-label">月份可覆盖</div><div class="card-value">58/58</div><div class="card-sub">2022–2026 · 新能源 46/58</div></div><div class="card"><div class="card-label">解析日历覆盖</div><div class="card-value">97.7%</div><div class="card-sub">2022–2026 · 缺口 40 天</div></div></div>
+</section>
+
+<section>
+  <h2>资产分层</h2>
+  <p class="section-note">按数据层级看原始文章与已解析区间；原始文章按统计周截止年归属，和解析区间不完全一一对应。</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>层级</th><th>覆盖年份</th><th>原始文章</th><th>已解析区间</th><th>说明</th></tr></thead>
+      <tbody><tr><td><span class="pill">原始归档</span></td><td>2020–2021</td><td class="num">99</td><td class="num">0</td><td>仅原始 HTML；旧格式未解析</td></tr><tr><td><span class="pill">Legacy V2</span></td><td>2022–2023</td><td class="num">99</td><td class="num">98</td><td>乘用车零售/批发；部分新能源/YTD</td></tr><tr><td><span class="pill">正式数据</span></td><td>2024–2026*</td><td class="num">134</td><td class="num">134</td><td>完整周度/月度正式数据</td></tr><tr class="total"><td>合计</td><td>2020–2026</td><td class="num">332</td><td class="num">232</td><td>原始归档 + Legacy V2 + 正式数据</td></tr></tbody>
+    </table>
+  </div>
+  <p class="section-note">* 2026 年截至 2026-10-18。2022–2023 的原始文章与解析区间差异来自同 period 旧版去重和一篇文章拆分多个区间。</p>
+</section>
+
+<section>
+  <h2>年度区间覆盖</h2>
+  <p class="section-note">周度区间 = <code>kind=month_to_date</code>；月度收盘 = <code>kind=month</code>。周度是 CPCA 官方发布区间，不保证 7 天。</p>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>年份 / 层级</th><th>原始文章</th><th>已解析区间</th><th>周度区间</th><th>月度收盘</th>
+          <th>周度<br>乘用车</th><th>周度<br>新能源</th><th>月度<br>乘用车</th><th>月度<br>新能源</th><th>日历覆盖</th>
+        </tr>
+      </thead>
+      <tbody><tr><td><strong>2020</strong><br><span class="muted">原始归档</span></td><td class="num">50</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="calendar">0 / 366<div class="muted">0.0%</div><div class="bar"><span style="width:0.0%"></span></div></td></tr><tr><td><strong>2021</strong><br><span class="muted">原始归档</span></td><td class="num">49</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="calendar">0 / 365<div class="muted">0.0%</div><div class="bar"><span style="width:0.0%"></span></div></td></tr><tr><td><strong>2022</strong><br><span class="muted">Legacy V2</span></td><td class="num">50</td><td class="num">50</td><td class="num">48</td><td class="num">2</td><td class="num">48</td><td class="num">0</td><td class="num">2</td><td class="num">0</td><td class="calendar">358 / 365<div class="muted">98.1%</div><div class="bar"><span style="width:98.1%"></span></div></td></tr><tr><td><strong>2023</strong><br><span class="muted">Legacy V2</span></td><td class="num">49</td><td class="num">48</td><td class="num">37</td><td class="num">11</td><td class="num">37</td><td class="num">35</td><td class="num">11</td><td class="num">11</td><td class="calendar">365 / 365<div class="muted">100.0%</div><div class="bar"><span style="width:100.0%"></span></div></td></tr><tr><td><strong>2024</strong><br><span class="muted">正式数据</span></td><td class="num">48</td><td class="num">48</td><td class="num">36</td><td class="num">12</td><td class="num">36</td><td class="num">36</td><td class="num">12</td><td class="num">12</td><td class="calendar">366 / 366<div class="muted">100.0%</div><div class="bar"><span style="width:100.0%"></span></div></td></tr><tr><td><strong>2025</strong><br><span class="muted">正式数据</span></td><td class="num">51</td><td class="num">51</td><td class="num">39</td><td class="num">12</td><td class="num">39</td><td class="num">39</td><td class="num">12</td><td class="num">12</td><td class="calendar">365 / 365<div class="muted">100.0%</div><div class="bar"><span style="width:100.0%"></span></div></td></tr><tr><td><strong>2026</strong><br><span class="muted">正式数据</span></td><td class="num">35</td><td class="num">35</td><td class="num">28</td><td class="num">7</td><td class="num">28</td><td class="num">28</td><td class="num">7</td><td class="num">7</td><td class="calendar">258 / 291<div class="muted">88.7%</div><div class="bar"><span style="width:88.7%"></span></div></td></tr></tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <h2>年度月份覆盖</h2>
+  <p class="section-note">“可覆盖月份”表示该月至少有一个区间（含周度 MTD）带有该指标；“完整月度收盘”严格要求该月有 <code>kind=month</code> 记录。2026 年按截至 2026-10-18 的 10 个月计算。</p>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>年份</th><th>审计月份</th><th>可覆盖<br>乘用车</th><th>可覆盖<br>新能源</th>
+          <th>完整收盘<br>乘用车</th><th>完整收盘<br>新能源</th><th>完整收盘缺口月份</th>
+        </tr>
+      </thead>
+      <tbody><tr><td><strong>2020</strong></td><td class="num">12</td><td class="num">0 / 12</td><td class="num">0 / 12</td><td class="num">0 / 12</td><td class="num">0 / 12</td><td>1–12</td></tr><tr><td><strong>2021</strong></td><td class="num">12</td><td class="num">0 / 12</td><td class="num">0 / 12</td><td class="num">0 / 12</td><td class="num">0 / 12</td><td>1–12</td></tr><tr><td><strong>2022</strong></td><td class="num">12</td><td class="num">12 / 12</td><td class="num">0 / 12</td><td class="num">2 / 12</td><td class="num">0 / 12</td><td>1–4、6–8、10–12</td></tr><tr><td><strong>2023</strong></td><td class="num">12</td><td class="num">12 / 12</td><td class="num">12 / 12</td><td class="num">11 / 12</td><td class="num">11 / 12</td><td>1</td></tr><tr><td><strong>2024</strong></td><td class="num">12</td><td class="num">12 / 12</td><td class="num">12 / 12</td><td class="num">12 / 12</td><td class="num">12 / 12</td><td>—</td></tr><tr><td><strong>2025</strong></td><td class="num">12</td><td class="num">12 / 12</td><td class="num">12 / 12</td><td class="num">12 / 12</td><td class="num">12 / 12</td><td>—</td></tr><tr><td><strong>2026</strong></td><td class="num">10</td><td class="num">10 / 10</td><td class="num">10 / 10</td><td class="num">7 / 10</td><td class="num">7 / 10</td><td>1–2、10（未结束）</td></tr></tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <h2>缺口明细</h2>
+  <h3>日历与官方发布缺口</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>年份</th><th>类型</th><th>区间</th><th>天数</th><th>说明</th></tr></thead>
+      <tbody><tr><td>2020</td><td><span class="gap-tag">未解析</span></td><td>2020-01-01 ~ 2020-12-31</td><td class="num">366</td><td>原始 HTML 已归档；旧格式只有周度日均叙述，未生成结构化数据</td></tr><tr><td>2021</td><td><span class="gap-tag">未解析</span></td><td>2021-01-01 ~ 2021-12-31</td><td class="num">365</td><td>原始 HTML 已归档；旧格式只有周度日均叙述，未生成结构化数据</td></tr><tr><td>2022</td><td><span class="gap-tag">日历缺口</span></td><td>2022-10-01 ~ 2022-10-07</td><td class="num">7</td><td>官网无独立周摘要；10/16 文章只有 10/8-16 与 10/1-16 累计，不用累计差反推</td></tr><tr><td>2026</td><td><span class="gap-tag">官方未发布</span></td><td>2026-01-19 ~ 2026-01-31</td><td class="num">13</td><td>春节前停更/发布节奏；官网无对应周报区间</td></tr><tr><td>2026</td><td><span class="gap-tag">官方未发布</span></td><td>2026-02-09 ~ 2026-02-28</td><td class="num">20</td><td>春节假期/节后恢复；官网无对应周报区间</td></tr></tbody>
+    </table>
+  </div>
+
+  <h3>指标与月度收盘缺口</h3>
+  <p class="section-note">完整月度收盘缺口按当前已入库资产统计；2022 旧格式文章中的部分月末累计表述尚未入库，不计入覆盖。</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>年份</th><th>类型</th><th>区间</th><th>天数</th><th>影响指标</th><th>说明</th></tr></thead>
+      <tbody><tr><td>2022</td><td><span class="gap-tag">新能源缺口</span></td><td>2022-01-01 ~ 2022-12-31</td><td class="num">365</td><td>新能源零售</td><td>该年旧格式摘要不发布新能源零售</td></tr><tr><td>2023</td><td><span class="gap-tag">新能源缺口</span></td><td>2023-01-01 ~ 2023-01-08</td><td class="num">8</td><td>新能源零售</td><td>该区间有乘用车零售，但没有新能源零售速报</td></tr><tr><td>2023</td><td><span class="gap-tag">新能源缺口</span></td><td>2023-01-28 ~ 2023-01-31</td><td class="num">4</td><td>新能源零售</td><td>该区间有乘用车零售，但没有新能源零售速报</td></tr><tr><td>2022</td><td><span class="gap-tag">完整月度收盘缺口</span></td><td>2022-01-01 ~ 2022-04-30</td><td class="num">120</td><td>完整月度收盘（乘用车）</td><td>1–4 月只有周度 MTD；当前资产仅 5、9 月有完整月度收盘</td></tr><tr><td>2022</td><td><span class="gap-tag">完整月度收盘缺口</span></td><td>2022-06-01 ~ 2022-08-31</td><td class="num">92</td><td>完整月度收盘（乘用车）</td><td>6–8 月只有周度 MTD；当前资产仅 5、9 月有完整月度收盘</td></tr><tr><td>2022</td><td><span class="gap-tag">完整月度收盘缺口</span></td><td>2022-10-01 ~ 2022-12-31</td><td class="num">92</td><td>完整月度收盘（乘用车）</td><td>10–12 月只有周度 MTD；当前资产仅 5、9 月有完整月度收盘</td></tr><tr><td>2023</td><td><span class="gap-tag">完整月度收盘缺口</span></td><td>2023-01-01 ~ 2023-01-31</td><td class="num">31</td><td>完整月度收盘（乘用车/新能源）</td><td>1 月缺少 kind=month 全月收盘；周度 MTD 不等同于全月收盘</td></tr><tr><td>2026</td><td><span class="gap-tag">完整月度收盘缺口</span></td><td>2026-01-01 ~ 2026-02-28</td><td class="num">59</td><td>完整月度收盘（乘用车/新能源）</td><td>1–2 月缺少 kind=month 全月收盘；周度 MTD 不等同于全月收盘</td></tr></tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <h2>口径说明</h2>
+  <ul class="notes">
+    <li><strong>周度区间</strong>是 CPCA 官方发布统计区间，不保证 7 天；不补官网未发布的自然周。</li>
+    <li><strong>月份可覆盖</strong>只表示该月有任意部分区间数据，不等于有完整月度总量；<strong>完整月度收盘</strong>才表示该月有全月口径数据。</li>
+    <li><strong>日历覆盖</strong>按所有已解析区间的日期并集计算；2026 年按 1 月 1 日至 2026-10-18 计算。</li>
+    <li>2020–2021 只有原始 HTML 归档，没有进入 `data/*.json` 或 `data/legacy/*.json`，因此按未解析处理。</li>
+    <li>缺口只记录，不补数、不插值、不从累计值反推缺失周。</li>
+    <li>本报告只审计已入库数据，原始 HTML 中存在但尚未解析的叙述不计入覆盖。</li>
+  </ul>
+</section>
+
+<footer>
+  数据来源：CPCA（乘联会） · 审计脚本：scripts/coverage_audit.py<br>
+  输出：data/coverage_audit.csv、data/coverage_gaps.csv · 本报告为离线单文件 HTML
+</footer>
+</div>
+</body>
+</html>

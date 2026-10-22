@@ -1,0 +1,51 @@
+# macOS
+.DS_Store
+._*
+.AppleDouble
+.LSOverride
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+build/
+dist/
+*.egg-info/
+pip-wheel-metadata/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Logs and temporary files
+*.log
+*.tmp
+.cache/
+tmp/
+
+# Editors / IDEs
+.idea/
+.vscode/
+.history/
+*.swp
+*.swo
+Thumbs.db
+
+# Local generated datasets and raw source archives (not synchronized)
+/data/
+/input/official/raw/
+/input/legacy/raw/
+
+# Transient failure samples
+input/official/blocks_failed/
+input/legacy/blocks_failed/

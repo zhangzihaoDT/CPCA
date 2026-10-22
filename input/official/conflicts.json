@@ -1,0 +1,279 @@
+{
+  "generated_at": "2026-10-22T14:12:16",
+  "policy": "conflicts are reports only; canonical data is not overwritten",
+  "stats": {
+    "official_blocks": 134,
+    "month": 31,
+    "week": 103,
+    "new": 0,
+    "matched": 132,
+    "conflicts": 2,
+    "parse_failed": 0,
+    "missing_ytd": 3,
+    "missing_penetration": 63,
+    "written": 134,
+    "accepted_conflicts": 2
+  },
+  "conflicts": [
+    {
+      "period_end": "2025-10-31",
+      "article_id": "4036",
+      "url": "https://www.cpcaauto.com/newslist.php?types=csjd&id=4036",
+      "title": "【周度分析】车市扫描(20251027-1031)",
+      "canonical_path": "data/2025-10-31.json",
+      "block_path": "input/official/blocks/2025-10-31.md",
+      "raw_path": "input/official/raw/4036.html",
+      "differences": [
+        {
+          "metric": "passenger_retail",
+          "field": "ytd_value",
+          "official": 1939.5,
+          "canonical": 939.5
+        }
+      ],
+      "details": {
+        "passenger_retail": {
+          "value": {
+            "official": 238.7,
+            "canonical": 238.7
+          },
+          "yoy_pct": {
+            "official": 6.0,
+            "canonical": 6.0
+          },
+          "vs_prev_month_same_period_pct": {
+            "official": 7.0,
+            "canonical": 7.0
+          },
+          "ytd_value": {
+            "official": 1939.5,
+            "canonical": 939.5
+          },
+          "ytd_yoy_pct": {
+            "official": 9.0,
+            "canonical": 9.0
+          }
+        },
+        "passenger_wholesale": {
+          "value": {
+            "official": 292.2,
+            "canonical": 292.2
+          },
+          "yoy_pct": {
+            "official": 7.0,
+            "canonical": 7.0
+          },
+          "vs_prev_month_same_period_pct": {
+            "official": 4.0,
+            "canonical": 4.0
+          },
+          "ytd_value": {
+            "official": 2376.9,
+            "canonical": 2376.9
+          },
+          "ytd_yoy_pct": {
+            "official": 12.0,
+            "canonical": 12.0
+          }
+        },
+        "nev_retail": {
+          "value": {
+            "official": 140.0,
+            "canonical": 140.0
+          },
+          "yoy_pct": {
+            "official": 17.0,
+            "canonical": 17.0
+          },
+          "vs_prev_month_same_period_pct": {
+            "official": 8.0,
+            "canonical": 8.0
+          },
+          "ytd_value": {
+            "official": 1027.0,
+            "canonical": 1027.0
+          },
+          "ytd_yoy_pct": {
+            "official": 23.0,
+            "canonical": 23.0
+          }
+        },
+        "nev_wholesale": {
+          "value": {
+            "official": 161.4,
+            "canonical": 161.4
+          },
+          "yoy_pct": {
+            "official": 16.0,
+            "canonical": 16.0
+          },
+          "vs_prev_month_same_period_pct": {
+            "official": 8.0,
+            "canonical": 8.0
+          },
+          "ytd_value": {
+            "official": 1206.1,
+            "canonical": 1206.1
+          },
+          "ytd_yoy_pct": {
+            "official": 30.0,
+            "canonical": 30.0
+          }
+        },
+        "penetration": {
+          "official": {
+            "retail_pct": 58.7,
+            "wholesale_pct": 55.2
+          },
+          "canonical": {
+            "retail_pct": 58.7,
+            "wholesale_pct": 55.2
+          }
+        }
+      },
+      "accepted": true
+    },
+    {
+      "period_end": "2025-12-28",
+      "article_id": "4097",
+      "url": "https://www.cpcaauto.com/newslist.php?types=csjd&id=4097",
+      "title": "【周度分析】车市扫描(20251222-1228)",
+      "canonical_path": "data/2025-12-28.json",
+      "block_path": "input/official/blocks/2025-12-28.md",
+      "raw_path": "input/official/raw/4097.html",
+      "differences": [
+        {
+          "metric": "nev_wholesale",
+          "field": "value",
+          "official": 126.1,
+          "canonical": 119.2
+        },
+        {
+          "metric": "nev_wholesale",
+          "field": "yoy_pct",
+          "official": -4.0,
+          "canonical": 5.0
+        },
+        {
+          "metric": "nev_wholesale",
+          "field": "vs_prev_month_same_period_pct",
+          "official": -16.0,
+          "canonical": 1.0
+        },
+        {
+          "metric": "nev_wholesale",
+          "field": "ytd_value",
+          "official": 1501.7,
+          "canonical": 1266.4
+        },
+        {
+          "metric": "nev_wholesale",
+          "field": "ytd_yoy_pct",
+          "official": 25.0,
+          "canonical": 18.0
+        }
+      ],
+      "details": {
+        "passenger_retail": {
+          "value": {
+            "official": 192.8,
+            "canonical": 192.8
+          },
+          "yoy_pct": {
+            "official": -17.0,
+            "canonical": -17.0
+          },
+          "vs_prev_month_same_period_pct": {
+            "official": -3.0,
+            "canonical": -3.0
+          },
+          "ytd_value": {
+            "official": 2341.1,
+            "canonical": 2341.1
+          },
+          "ytd_yoy_pct": {
+            "official": 4.0,
+            "canonical": 4.0
+          }
+        },
+        "passenger_wholesale": {
+          "value": {
+            "official": 213.4,
+            "canonical": 213.4
+          },
+          "yoy_pct": {
+            "official": -19.0,
+            "canonical": -19.0
+          },
+          "vs_prev_month_same_period_pct": {
+            "official": -19.0,
+            "canonical": -19.0
+          },
+          "ytd_value": {
+            "official": 2889.9,
+            "canonical": 2889.9
+          },
+          "ytd_yoy_pct": {
+            "official": 8.0,
+            "canonical": 8.0
+          }
+        },
+        "nev_retail": {
+          "value": {
+            "official": 119.2,
+            "canonical": 119.2
+          },
+          "yoy_pct": {
+            "official": 5.0,
+            "canonical": 5.0
+          },
+          "vs_prev_month_same_period_pct": {
+            "official": 1.0,
+            "canonical": 1.0
+          },
+          "ytd_value": {
+            "official": 1266.4,
+            "canonical": 1266.4
+          },
+          "ytd_yoy_pct": {
+            "official": 18.0,
+            "canonical": 18.0
+          }
+        },
+        "nev_wholesale": {
+          "value": {
+            "official": 126.1,
+            "canonical": 119.2
+          },
+          "yoy_pct": {
+            "official": -4.0,
+            "canonical": 5.0
+          },
+          "vs_prev_month_same_period_pct": {
+            "official": -16.0,
+            "canonical": 1.0
+          },
+          "ytd_value": {
+            "official": 1501.7,
+            "canonical": 1266.4
+          },
+          "ytd_yoy_pct": {
+            "official": 25.0,
+            "canonical": 18.0
+          }
+        },
+        "penetration": {
+          "official": {
+            "retail_pct": 61.8,
+            "wholesale_pct": 59.1
+          },
+          "canonical": {
+            "retail_pct": 61.8,
+            "wholesale_pct": 59.1
+          }
+        }
+      },
+      "accepted": true
+    }
+  ]
+}

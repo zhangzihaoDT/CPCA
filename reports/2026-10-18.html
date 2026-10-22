@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>全国乘用车市场零售简报 · 2026年10月1–18日</title>
+<style>
+:root {
+  --blue: #174A7C;
+  --deep: #06213D;
+  --cyan: #7ECDEB;
+  --light-blue: #DDEFF8;
+  --cream: #FFF9EF;
+  --gold: #D79A36;
+  --text: #1F2D3D;
+  --muted: #6B7C8F;
+  --line: #E6EDF4;
+  --positive: #2F7D6D;
+  --negative: #B85C4A;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  background:
+    radial-gradient(circle at 12% 8%, rgba(126, 205, 235, 0.18), transparent 30%),
+    radial-gradient(circle at 88% 2%, rgba(215, 154, 54, 0.12), transparent 26%),
+    var(--cream);
+  line-height: 1.6;
+}
+.brief {
+  width: calc(100% - 32px);
+  max-width: 860px;
+  margin: 24px auto;
+  padding: 30px 38px 20px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: #FFFFFF;
+  box-shadow: 0 20px 55px rgba(6, 33, 61, 0.06);
+}
+.brief-header { padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+.header-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.eyebrow { color: var(--blue); font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
+.brand {
+  padding: 3px 8px;
+  border: 1.5px solid var(--blue);
+  border-radius: 7px;
+  color: var(--blue);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+h1 {
+  margin: 10px 0 4px;
+  color: var(--deep);
+  font-size: clamp(30px, 4.2vw, 36px);
+  font-weight: 750;
+  line-height: 1.1;
+  letter-spacing: -0.035em;
+}
+.subtitle { margin: 0; color: var(--muted); font-size: 12px; }
+.section {
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+.section:first-of-type { border-top: none; }
+.section.is-latest {
+  margin: 10px 0 0;
+  padding: 14px 16px;
+  border: 1px solid #DDEFF8;
+  border-radius: 16px;
+  background: #F8FCFF;
+}
+.section.is-latest + .section { border-top: 1px solid var(--line); }
+.section-head { margin-bottom: 7px; }
+.section-index { color: var(--blue); font-size: 9px; font-weight: 800; letter-spacing: 0.12em; }
+.section.is-latest .section-index { color: var(--gold); }
+.section-head h2 { margin: 1px 0; color: var(--deep); font-size: 16px; letter-spacing: -0.01em; }
+.section-date { color: var(--muted); font-size: 10px; }
+.metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.metric {
+  display: flex;
+  gap: 9px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #FFFFFF;
+}
+.metric-icon {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--light-blue);
+  color: var(--blue);
+}
+.metric-icon.spark { background: #FFF4E2; color: var(--gold); }
+.metric-icon svg { width: 17px; height: 17px; }
+.metric-content { min-width: 0; }
+.metric-label { color: var(--muted); font-size: 10px; }
+.metric-value {
+  margin: 2px 0 3px;
+  color: var(--deep);
+  font-size: 24px;
+  font-weight: 750;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.unit { margin-left: 3px; color: var(--muted); font-size: 9px; font-weight: 500; letter-spacing: 0; }
+.metric-yoy { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.yoy-label { color: var(--muted); font-size: 9px; }
+.yoy-value { font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.yoy-value.negative { color: var(--negative); }
+.yoy-value.positive { color: var(--positive); }
+.yoy-value.flat { color: var(--muted); }
+.arrow { margin-right: 2px; }
+.brief-footer {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.7;
+}
+.sep { margin: 0 5px; color: #B9C6D3; }
+@media (max-width: 760px) {
+  .brief { width: auto; margin: 12px; padding: 22px 18px 18px; border-radius: 18px; }
+  h1 { font-size: 30px; }
+  .section { padding: 18px 0; }
+  .section.is-latest { padding: 16px 14px; margin-top: 14px; }
+  .section-head { margin-bottom: 10px; }
+  .metrics { grid-template-columns: 1fr; gap: 9px; }
+  .metric { padding: 10px 12px; }
+  .metric-value { font-size: 24px; }
+  .brief-footer { font-size: 9px; }
+}
+@media (max-height: 820px) and (min-width: 761px) {
+  .brief { margin: 10px auto; padding: 20px 30px 14px; }
+  h1 { font-size: 30px; }
+  .brief-header { padding-bottom: 12px; }
+  .section { padding: 10px 0; }
+  .section.is-latest { padding: 10px 14px; margin-top: 8px; }
+  .section-head { margin-bottom: 5px; }
+  .metric { padding: 8px 10px; }
+  .metric-value { font-size: 21px; }
+  .metric-icon { width: 26px; height: 26px; }
+  .brief-footer { margin-top: 8px; padding-top: 8px; }
+}
+@media print {
+  body { background: #FFFFFF; }
+  .brief { max-width: none; margin: 0; padding: 0; border: none; box-shadow: none; }
+  .section { break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+<main class="brief">
+  <header class="brief-header">
+    <div class="header-row">
+      <div class="eyebrow">CPCA WEEKLY · 乘联会周度数据</div>
+      <div class="brand">CPCA</div>
+    </div>
+    <h1>全国乘用车市场<br>零售简报</h1>
+    <p class="subtitle">数据统计：2026年10月1–18日（初步统计）</p>
+  </header>
+  
+    <section class="section is-latest">
+      <div class="section-head">
+        <div class="section-index">01</div>
+        <h2>最新区间</h2>
+        <div class="section-date">10月12–18日</div>
+      </div>
+      <div class="metrics">
+      <article class="metric">
+        <div class="metric-icon car">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M4 15.5V12l2-4.5h12L20 12v3.5"/>
+  <path d="M4 15.5h16"/>
+  <path d="M6.5 7.5h11"/>
+  <circle cx="8" cy="16.5" r="1.2"/>
+  <circle cx="16" cy="16.5" r="1.2"/>
+</svg>
+</div>
+        <div class="metric-content">
+          <div class="metric-label">乘用车市场零售</div>
+          <div class="metric-value">33.0<span class="unit">万辆</span></div>
+          <div class="metric-yoy">
+            <span class="yoy-label">同比去年同期（估算）</span>
+            <span class="yoy-value negative"><span class="arrow">↓</span>−28.6%</span>
+          </div>
+        </div>
+      </article>
+    
+      <article class="metric">
+        <div class="metric-icon spark">
+<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+  <path d="M12 2.5l2.2 7.3L21.5 12l-7.3 2.2L12 21.5l-2.2-7.3L2.5 12l7.3-2.2L12 2.5z"/>
+</svg>
+</div>
+        <div class="metric-content">
+          <div class="metric-label">新能源市场零售</div>
+          <div class="metric-value">23.9<span class="unit">万辆</span></div>
+          <div class="metric-yoy">
+            <span class="yoy-label">同比去年同期（估算）</span>
+            <span class="yoy-value negative"><span class="arrow">↓</span>−13.0%</span>
+          </div>
+        </div>
+      </article>
+    </div>
+    </section>
+    
+    <section class="section">
+      <div class="section-head">
+        <div class="section-index">02</div>
+        <h2>当月累计</h2>
+        <div class="section-date">10月1–18日</div>
+      </div>
+      <div class="metrics">
+      <article class="metric">
+        <div class="metric-icon car">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M4 15.5V12l2-4.5h12L20 12v3.5"/>
+  <path d="M4 15.5h16"/>
+  <path d="M6.5 7.5h11"/>
+  <circle cx="8" cy="16.5" r="1.2"/>
+  <circle cx="16" cy="16.5" r="1.2"/>
+</svg>
+</div>
+        <div class="metric-content">
+          <div class="metric-label">乘用车市场零售</div>
+          <div class="metric-value">78.9<span class="unit">万辆</span></div>
+          <div class="metric-yoy">
+            <span class="yoy-label">同比去年同期</span>
+            <span class="yoy-value negative"><span class="arrow">↓</span>−26%</span>
+          </div>
+        </div>
+      </article>
+    
+      <article class="metric">
+        <div class="metric-icon spark">
+<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+  <path d="M12 2.5l2.2 7.3L21.5 12l-7.3 2.2L12 21.5l-2.2-7.3L2.5 12l7.3-2.2L12 2.5z"/>
+</svg>
+</div>
+        <div class="metric-content">
+          <div class="metric-label">新能源市场零售</div>
+          <div class="metric-value">52.0<span class="unit">万辆</span></div>
+          <div class="metric-yoy">
+            <span class="yoy-label">同比去年同期</span>
+            <span class="yoy-value negative"><span class="arrow">↓</span>−13%</span>
+          </div>
+        </div>
+      </article>
+    </div>
+    </section>
+    
+    <section class="section">
+      <div class="section-head">
+        <div class="section-index">03</div>
+        <h2>当年累计</h2>
+        <div class="section-date">1月1日–10月18日</div>
+      </div>
+      <div class="metrics">
+      <article class="metric">
+        <div class="metric-icon car">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M4 15.5V12l2-4.5h12L20 12v3.5"/>
+  <path d="M4 15.5h16"/>
+  <path d="M6.5 7.5h11"/>
+  <circle cx="8" cy="16.5" r="1.2"/>
+  <circle cx="16" cy="16.5" r="1.2"/>
+</svg>
+</div>
+        <div class="metric-content">
+          <div class="metric-label">乘用车市场零售</div>
+          <div class="metric-value">1,412.3<span class="unit">万辆</span></div>
+          <div class="metric-yoy">
+            <span class="yoy-label">同比去年同期</span>
+            <span class="yoy-value negative"><span class="arrow">↓</span>−22%</span>
+          </div>
+        </div>
+      </article>
+    
+      <article class="metric">
+        <div class="metric-icon spark">
+<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+  <path d="M12 2.5l2.2 7.3L21.5 12l-7.3 2.2L12 21.5l-2.2-7.3L2.5 12l7.3-2.2L12 2.5z"/>
+</svg>
+</div>
+        <div class="metric-content">
+          <div class="metric-label">新能源市场零售</div>
+          <div class="metric-value">827.8<span class="unit">万辆</span></div>
+          <div class="metric-yoy">
+            <span class="yoy-label">同比去年同期</span>
+            <span class="yoy-value negative"><span class="arrow">↓</span>−13%</span>
+          </div>
+        </div>
+      </article>
+    </div>
+    </section>
+    
+  <footer class="brief-footer">
+    <span>数据来源：乘联会（CPCA）</span>
+    <span class="sep">｜</span>
+    <span>注：本简报为乘用车市场零售销量（含新能源），单位：万辆。</span>
+  </footer>
+</main>
+</body>
+</html>
