@@ -1,18 +1,30 @@
-# CPCA Weekly · 乘联会周度数据跟踪
+# CPCA · 乘联会数据管道
 
-一个用于跟踪乘联会（CPCA）周度数据指标的轻量项目。
+CPCA 是 `mashang-data` 管理的汽车行业数据管道，位于平台的 `mashang-data/CPCA/`，以 Git 子模块保留独立的历史和远端。项目采集乘联会发布的乘用车市场数据，维护可追溯的年度数据，并生成《全国乘用车市场零售简报》。
 
-官方历史数据从 CPCA 官网抓取；`input/weekly.md` 仅作为手工种子/兜底。结构化数据进入审计用 JSON 和标准表 CSV，再由 `cpca-weekly-report` 生成 HTML 版《全国乘用车市场零售简报》。
+## 2026-11-26 更新
 
-> **当前发布：v1.0.0 · 2026-10-22**  
-> 本地数据截至 2026-11-22。2022 年起提供年度结构化数据，2020–2021 年保留原始归档。
+- **数据截至 2026-11-22。** 补齐了统计截止日在 10 月 25 日至 11 月 22 日的 5 期数据，包含 10 月全月初步统计。历史复核补录了 2024 年 1 月首期和旧版摘要中的 9 份全月初步统计。 [最新周报](reports/2026-11-22.html)
+- **年度资产从 2022 年开始。** `data/annual/YYYY.json` 每年一份，收录 247 个《车市扫描》区间和 15 份独立月报。2020–2021 年保留 99 篇原始 HTML 归档。
+- **年度审计以 2022 年起的覆盖率为主。** 月度四项指标齐全率为 **100%（58/58 个已结束月份）**，已入库周度齐全率为 **74.1%（143/193 个区间）**，《车市扫描》日历覆盖率为 **98.2%（1,754/1,787 天）**。 [年度审计报告](reports/coverage_audit.html) · [回填与缺口记录](docs/findings.md#年度审计更新2026-11-26)
+
+| 年份 | 月度四项齐全 | 周度四项齐全 | 《车市扫描》日历覆盖 |
+| --- | ---: | ---: | ---: |
+| 2022 | 12/12 | 0/48 | 100% |
+| 2023 | 12/12 | 35/37 | 100% |
+| 2024 | 12/12 | 37/37 | 100% |
+| 2025 | 12/12 | 39/39 | 100% |
+| 2026（截至 11/22） | 10/10 | 32/32 | 89.9% |
+
+四项指标为乘用车和新能源的零售、批发。月度覆盖纳入独立《乘用车市场分析》，保留各自的发布口径。周度分母为已入库区间。2022 年的周度新能源和 2026 年春节前后的发布空档仍记在审计缺口中。
+
+在平台根目录可用 `make status` 查看子模块版本，或用 `make validate-cpca` 校验正式和历史数据。采集、入库和生成报告从 CPCA 根目录运行。
 
 ## 1. 项目定位
 
-- 只跟踪 CPCA 周度发布中的乘用车市场指标。
-- 官方历史数据从 CPCA 官网抓取；`input/weekly.md` 仅作为手工种子/兜底。
-- 原始文本、结构化数据集、HTML 周报按统计区间一一对应，可回溯。
-- 只抓取 CPCA 官网“车市扫描”栏目；不做预测、不合并其他数据源。
+- 周度数据来源为 CPCA 官网《车市扫描》，`input/weekly.md` 用于手工种子和兜底。
+- 历史月度补充来源为 CPCA 官网《乘用车市场分析》，按原发布口径记入年度资产。
+- 原始证据和结构化数据按来源及统计区间关联，周报可追溯到正式数据。
 
 项目首先是一份可复查的数据台账，其次才是一份可阅读的周报。
 
@@ -64,7 +76,7 @@ input/weekly.md ───> ingest_weekly.py ────────────
 
 `input/official/` 是官网来源归档，`input/weekly.md` 是手工种子/兜底文本。正式数据统一写入 `data/*.json`，不保留两套并行的 JSON 事实源。官方历史回填使用 `fetch_cpca_history.py` + `ingest_official.py`；手工文本使用 `ingest_weekly.py`，且不会覆盖 `origin=official` 的正式数据。
 
-Legacy V2 是旁路：`input/legacy/` → `data/legacy/`，不经过 `ingest_official.py`、标准表或简报，属于可追溯历史资产，不是第二套正式事实源。
+Legacy V2 从 `input/legacy/` 生成 `data/legacy/`。年度审计读取正式区间、Legacy V2 和独立月报，生成按年划分的数据及覆盖率报告。周报由正式标准表生成。
 
 ## 4. 目录结构
 
@@ -78,13 +90,17 @@ Legacy V2 是旁路：`input/legacy/` → `data/legacy/`，不经过 `ingest_off
 │   │   ├── blocks/<date>.md       # 归一化“本周车市概述”
 │   │   ├── manifest.json          # 来源、时间、hash、统计
 │   │   └── conflicts.json         # 官方与正式数据差异报告
-│   └── legacy/                    # Legacy V2 旧格式归档（2020–2023）
-│       ├── raw/<id>.html          # 2020–2023 原始 HTML，本地归档，不纳入版本库
-│       ├── blocks/<date>.md       # 2022–2023 归一化旧格式摘要
-│       └── manifest.json          # 来源、时间、状态、统计
+│   ├── legacy/                    # Legacy V2 旧格式归档（2020–2023）
+│   │   ├── raw/<id>.html          # 2020–2023 原始 HTML，本地归档，不纳入版本库
+│   │   ├── blocks/<date>.md       # 2022–2023 归一化旧格式摘要
+│   │   └── manifest.json          # 来源、时间、状态、统计
+│   └── monthly/
+│       ├── reference.csv          # 独立月报核心指标、来源与内容哈希
+│       └── raw/<id>.html          # 月报原始 HTML，本地归档
 ├── data/                          # 本地生成，不纳入版本库
 │   ├── standard_dataset.csv       # 正式标准表：面向简报
 │   ├── YYYY-MM-DD.json            # 正式数据集（2024–2026）
+│   ├── annual/YYYY.json           # 2022 年起的年度数据包
 │   ├── coverage_audit.csv         # 年度覆盖率审计表
 │   ├── coverage_gaps.csv          # 缺口明细
 │   ├── weekly_retail.csv          # 官方统计周乘用车零售导出
@@ -101,7 +117,8 @@ Legacy V2 是旁路：`input/legacy/` → `data/legacy/`，不经过 `ingest_off
 │   ├── legacy_parse.py            # Legacy V2 旧格式解析
 │   ├── ingest_legacy.py           # 生成独立 Legacy 数据集
 │   ├── validate_legacy.py         # Legacy 数据集校验
-│   ├── coverage_audit.py          # 生成历史数据覆盖率审计
+│   ├── coverage_audit.py          # 生成年份数据及覆盖率审计
+│   ├── annual_data.py             # 年度记录和独立月报整理
 │   ├── export_weekly_retail.py    # 导出逐统计周乘用车零售 CSV
 │   ├── ingest_weekly.py           # 手工文本解析（不覆盖官方数据）
 │   ├── validate_data.py           # 正式 JSON 数据集校验
@@ -123,10 +140,11 @@ Legacy V2 是旁路：`input/legacy/` → `data/legacy/`，不经过 `ingest_off
 
 ## 5. 数据集
 
-`data/` 是本地生成目录，默认通过 `.gitignore` 排除，不随仓库同步；可由 `input/weekly.md`、`input/official/manifest.json` 和 `input/legacy/manifest.json` 重新生成。数据分两层：
+`data/` 是本地生成目录。Git 同步归一化摘要、来源清单、独立月报摘录及 HTML 报告。本地原始 HTML 在 `input/*/raw/` 中单独归档。
 
 - `data/standard_dataset.csv`：面向报告的标准表，只保留乘用车零售与新能源零售。
 - `data/YYYY-MM-DD.json`：正式数据集，保留完整指标、状态、来源与校验。
+- `data/annual/YYYY.json`：按年保存正式与历史区间、独立月报和审计缺口。
 
 ### 官方来源归档与正式数据
 
@@ -293,11 +311,11 @@ CSV 列包括：`时间维度`、`乘用车零售(万辆)`、`乘用车零售同
 ### 官方历史回填 / 增量
 
 ```bash
-# 1. 先列出目标范围文章
-python3 scripts/fetch_cpca_history.py --start 2024-01-14 --end 2025-12-31 --dry-run
+# 1. 刷新官网清单并列出目标范围
+python3 scripts/fetch_cpca_history.py --start 2026-10-19 --end 2026-11-22 --refresh-list --dry-run
 
-# 2. 抓取并提取（增量不要加 --clean）
-python3 scripts/fetch_cpca_history.py --start 2024-01-14 --end 2025-12-31
+# 2. 抓取并提取目标区间
+python3 scripts/fetch_cpca_history.py --start 2026-10-19 --end 2026-11-22
 
 # 3. 先对比，不写入
 python3 scripts/ingest_official.py
@@ -305,13 +323,14 @@ python3 scripts/ingest_official.py
 # 4. 确认无意外冲突后回填
 python3 scripts/ingest_official.py --write
 
-# 5. 校验、重建标准表、生成简报
+# 5. 校验并重建报告与年度数据
 python3 scripts/validate_data.py
 python3 scripts/build_standard_dataset.py
 python3 scripts/render_report.py
+python3 scripts/coverage_audit.py
 ```
 
-`--clean` 仅用于从零全量重建，会清空已有 blocks/manifest；按日期段增量回填不要加 `--clean`。脚本会跳过已缓存文章，`ingest_official.py` 只回填缺失 period，冲突只报告。
+`--refresh-list` 更新文章清单并复用已缓存正文。`ingest_official.py --write` 写入新增区间并更新匹配记录，冲突进入差异报告。`--clean` 会清空已有摘要和清单，用于全量重建。
 
 ### Legacy V2 历史数据（2022–2023）
 
@@ -337,7 +356,7 @@ Legacy 管线只写 `input/legacy/` 和 `data/legacy/`，不修改 `data/*.json`
 python3 scripts/coverage_audit.py
 ```
 
-生成 `data/coverage_audit.csv`、`data/coverage_gaps.csv` 和 `reports/coverage_audit.html`。审计只读现有正式数据、Legacy 数据和原始归档，不修改任何数据集。
+生成 `data/annual/YYYY.json`、`data/coverage_audit.csv`、`data/coverage_gaps.csv` 和 `reports/coverage_audit.html`。所需输入为正式 JSON、Legacy V2 JSON、归档摘要与独立月报摘录。纯 Git 检出可先运行 `python3 scripts/ingest_official.py --write` 和 `python3 scripts/ingest_legacy.py --write` 恢复结构化输入。
 
 ### 逐周乘用车零售导出
 
@@ -392,15 +411,15 @@ python3 scripts/render_report.py --period 2026-10-18 --out reports/2026-10-18.ht
 - 任意一期简报都能从 HTML 回溯到 `data/*.json`，再回溯到 `input/official/raw/<id>.html` 或 `input/weekly.md` 的对应区间。
 - Legacy V2 的每条记录都能从 `data/legacy/<date>.json` 回溯到 `input/legacy/raw/<article_id>.html`；2020–2021 只归档、不伪装成正式周数据。
 - 数据集字段完整、类型正确；缺失值留空并记录，不补数。
-- 覆盖率审计可从 `data/*.json` + `data/legacy/*.json` 重算，报告、CSV 与数据资产一致；缺口只记录、不补数。
+- 覆盖率审计可从正式区间、Legacy V2、其归档摘要及独立月报摘录重算。报告、CSV 和年度 JSON 对应同一快照。
 - 逐周导出每行对应一个官方统计区间或缺失周；无结构化数据写“无数据”，不用 0 或空值填充。
 - 官方数据与正式数据冲突时，只报告、不覆盖。
 - 简报正文只包含最新区间、当月累计、当年累计三段；不出现批发、生产、渗透率等扩展指标。
 - 单文件 HTML 在离线环境下可正常打开和阅读。
 
-## 11. 当前状态
+## 11. 校验记录
 
-- 本地正式数据截至 2026-11-22，最新文章发布于 2026-11-25。已补录 2024 年 1 月首期，正式数据有 108 个周度快照和 32 个全月区间。
+- 140 个正式区间包括 108 个周度快照和 32 个全月区间。
 - 2 条冲突已人工确认为解析修正（2025-10-31 的 `1.939.5` 千分位笔误、2025-12-28 的 ASCII 分号导致新能源批发串行），已接受官方值；当前无未解决冲突。
 - 缺失字段：`missing_ytd=3`、`missing_penetration=64`；原文未发布时留空。
 - 校验结果：0 错误；4 条渗透率警告（2025-04-30、2025-05-31 的发布值与销量比值不一致），保留原文，不调平。
@@ -408,14 +427,10 @@ python3 scripts/render_report.py --period 2026-10-18 --out reports/2026-10-18.ht
 - Legacy 覆盖：98 个区间全部有乘用车零售/批发；46 个含新能源，44 个含 YTD；缺失字段留空。
 - Legacy 数据：`data/legacy/` 98 个 JSON + 98 行 `legacy_dataset.csv`，不进入正式标准表和简报。
 - 2022-05-31 文章同时包含 5 月收盘与 6/1-5，已拆成两条区间；2022-10-01 至 10-07 官网无独立摘要，保留缺口，不反推。
-- 2020–2021 已归档 99 篇原始 HTML（`archived_only`），原始资产可追溯到 2020 年；解析数据从 2022 年起。
-- 年度数据包含《车市扫描》247 个区间（193 个周度区间、54 个全月区间）及 15 份独立月报。58 个已结束月份均有全月四项核心指标。
-- 年度覆盖率审计见 `reports/coverage_audit.html`、`data/coverage_audit.csv` 和 `data/coverage_gaps.csv`。完整年度记录见 `data/annual/`。
 - 逐周兼容导出 `data/weekly_retail.csv` 共 343 行，其中 238 行有数据，105 行标记 `无数据`。
 - 周度口径为官方发布周，不保证 7 天；不按自然周补齐。首周/间隔天数见 CSV 的 `日历天数`。
 - 文章清单存在 2026-01-19 至 2026-03-08 的 6 个空周；详见 `docs/findings.md`，不按自然周补齐。
 - 标准表 `data/standard_dataset.csv` 共 288 行，覆盖 2024-01 至 2026-11。
-- 最新简报见 `reports/2026-11-22.html`。
 - 跨月累计基数存在初步统计修订。标准表首周直接用原文当月累计，不用 YTD 差额，避免把基数修订算进当月。
 - 9月生产数据原文注明本周暂未更新，已记录为 `carried_over`。
 - 年份取自文章标题/发布时间，不再按采集日期推断；官方数据集 `year_inferred=false`。
