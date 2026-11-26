@@ -35,7 +35,7 @@ input/official/
 1. 列出目标文章，先 dry-run：
 
    ```bash
-   python3 scripts/fetch_cpca_history.py --start 2026-01-01 --dry-run
+   python3 scripts/fetch_cpca_history.py --start 2026-01-01 --refresh-list --dry-run
    ```
 
 2. 抓取并提取：
@@ -45,6 +45,7 @@ input/official/
    ```
 
    只有从零全量重建时才用 `--clean`；按日期段增量回填不要加 `--clean`，否则会清空已有 blocks/manifest。
+   继续更新时用 `--refresh-list` 获取新发布的文章清单，并复用已归档正文。
 
 3. 对比正式数据，先报告不写入：
 
@@ -58,18 +59,19 @@ input/official/
    python3 scripts/ingest_official.py --write
    ```
 
-5. 校验并重建标准表和简报：
+5. 校验并重建标准表、简报和年度数据：
 
    ```bash
    python3 scripts/validate_data.py
    python3 scripts/build_standard_dataset.py
    python3 scripts/render_report.py
+   python3 scripts/coverage_audit.py
    ```
 
 ## 兼容范围
 
-- **2024-01-17 起**：文章包含结构化“本周车市概述”，可进入当前 schema。
-- **2024-01-07 及以前（2020–2023）**：旧格式，没有完整的乘用车/新能源/渗透率摘要，不进入当前标准表；需要 legacy 解析或只保留原始 HTML。
+- **2024-01-07 起的统计区间**：文章包含可进入当前 schema 的乘用车和新能源结构化数据。1 月 7 日这期的摘要位于第一节内。
+- **2020–2023**：使用 Legacy V2 或保留原始 HTML。
 - 2025-01 至 2025-12 已验证可正常解析。
 
 ## 数据类型

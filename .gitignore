@@ -45,6 +45,7 @@ Thumbs.db
 /data/
 /input/official/raw/
 /input/legacy/raw/
+/input/monthly/raw/
 
 # Transient failure samples
 input/official/blocks_failed/

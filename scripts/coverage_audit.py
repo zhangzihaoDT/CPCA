@@ -25,6 +25,13 @@ from collections import Counter
 from datetime import date, timedelta
 from pathlib import Path
 
+from annual_data import (
+    METRICS,
+    load_monthly_references,
+    recover_legacy_months,
+    write_annual_exports,
+)
+
 ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT / "data"
 LEGACY_DATA_DIR = DATA_DIR / "legacy"
@@ -34,14 +41,9 @@ GAP_CSV_PATH = DATA_DIR / "coverage_gaps.csv"
 OFFICIAL_MANIFEST = ROOT / "input/official/manifest.json"
 LEGACY_MANIFEST = ROOT / "input/legacy/manifest.json"
 
-LAYER_BY_YEAR = {
-    2020: "原始归档",
-    2021: "原始归档",
-    2022: "Legacy V2",
-    2023: "Legacy V2",
-    2024: "正式数据",
-    2025: "正式数据",
-    2026: "正式数据",
+KNOWN_PUBLICATION_GAPS = {
+    (date(2026, 1, 19), date(2026, 1, 31)): "官网春节前无对应独立周报",
+    (date(2026, 2, 9), date(2026, 2, 28)): "官网春节前后无对应独立周报",
 }
 
 
@@ -124,20 +126,7 @@ def format_month_ranges(months: list[int]) -> str:
 
 
 def missing_close_label(year: dict) -> str:
-    label = format_month_ranges(year["missing_full_close"])
-    if year["year"] == 2026 and 10 in year["missing_full_close"]:
-        if label == "10":
-            label = "10（未结束）"
-        else:
-            label = label.replace("、10", "、10（未结束）")
-    return label
-
-
-def month_group_dates(year: int, group: list[int]) -> tuple[date, date]:
-    first, last = group[0], group[-1]
-    start = date(year, first, 1)
-    end = date(year, last, calendar.monthrange(year, last)[1])
-    return start, end
+    return format_month_ranges(year["missing_full_close"])
 
 
 def build_year(
@@ -145,13 +134,19 @@ def build_year(
     items: list[tuple[str, dict]],
     latest: date,
     raw_counts: Counter[int],
+    monthly_references: list[dict],
 ) -> dict:
+    layer = "原始归档" if year < 2022 else ("Legacy V2" if year < 2024 else "正式数据")
     start = date(year, 1, 1)
     end = date(year, 12, 31)
     if year == latest.year:
         end = latest
 
     audit_months = list(range(1, end.month + 1))
+    closed_months = [
+        month for month in audit_months
+        if date(year, month, calendar.monthrange(year, month)[1]) <= end
+    ] if year >= 2022 else []
     datasets = [
         dataset
         for _, dataset in items
@@ -159,6 +154,16 @@ def build_year(
     ]
     weekly = [dataset for dataset in datasets if dataset["period"]["kind"] == "month_to_date"]
     monthly = [dataset for dataset in datasets if dataset["period"]["kind"] == "month"]
+    reference_months = [
+        int(dataset["period"]["end"][5:7]) for dataset in monthly_references
+        if dataset["period"]["end"].startswith(f"{year}-")
+        and int(dataset["period"]["end"][5:7]) in closed_months
+    ]
+    complete_months = set(reference_months)
+    complete_months.update(
+        int(dataset["period"]["end"][5:7]) for dataset in monthly
+        if all(metric_value(dataset, key) is not None for key in METRICS)
+    )
 
     any_retail_months: list[int] = []
     any_nev_months: list[int] = []
@@ -202,13 +207,12 @@ def build_year(
 
     total_days = (end - start).days + 1
     covered_days = len(covered)
-    missing_full_close = [
-        month for month in audit_months if month not in full_retail_months
-    ]
+    missing_full_close = [month for month in closed_months if month not in full_retail_months]
     nev_missing_periods = [
         {
             "start": dataset["period"]["start"],
             "end": dataset["period"]["end"],
+            "kind": dataset["period"]["kind"],
         }
         for dataset in datasets
         if metric_value(dataset, "passenger_retail") is not None
@@ -217,10 +221,14 @@ def build_year(
 
     return {
         "year": year,
-        "layer": LAYER_BY_YEAR.get(year, ""),
+        "layer": layer,
         "raw": raw_counts.get(year, 0),
         "parsed": len(datasets),
         "weekly": len(weekly),
+        "weekly_complete": sum(
+            all(metric_value(dataset, key) is not None for key in METRICS)
+            for dataset in weekly
+        ),
         "monthly": len(monthly),
         "weekly_retail": sum(
             1 for dataset in weekly if metric_value(dataset, "passenger_retail") is not None
@@ -241,6 +249,9 @@ def build_year(
             1 for dataset in datasets if metric_value(dataset, "nev_retail") is not None
         ),
         "audit_months": audit_months,
+        "closed_months": closed_months,
+        "reference_months": reference_months,
+        "complete_months": sorted(complete_months.intersection(closed_months)),
         "any_retail_months": any_retail_months,
         "any_nev_months": any_nev_months,
         "full_retail_months": full_retail_months,
@@ -258,13 +269,17 @@ def build_year(
 
 def build_summary() -> dict:
     items = load_datasets()
+    items.extend(recover_legacy_months(items))
     latest = max(date.fromisoformat(dataset["period"]["end"]) for _, dataset in items)
+    monthly_references = [
+        item for item in load_monthly_references() if item["period"]["end"] <= latest.isoformat()
+    ]
     raw_counts = load_raw_counts()
     years = [
-        build_year(year, items, latest, raw_counts)
+        build_year(year, items, latest, raw_counts, monthly_references)
         for year in range(2020, latest.year + 1)
     ]
-    parsed_years = [year for year in years if year["parsed"] > 0]
+    parsed_years = [year for year in years if year["year"] >= 2022]
 
     total_raw = sum(year["raw"] for year in years)
     total_parsed = sum(year["parsed"] for year in years)
@@ -288,78 +303,36 @@ def build_summary() -> dict:
     calendar_pct = calendar_covered / calendar_total * 100 if calendar_total else 0.0
     calendar_gap_days = calendar_total - calendar_covered
 
-    layer_rows = []
-    for layer, label, year_numbers, description in [
-        ("原始归档", "2020–2021", range(2020, 2022), "仅原始 HTML；旧格式未解析"),
-        (
-            "Legacy V2",
-            "2022–2023",
-            range(2022, 2024),
-            "乘用车零售/批发；部分新能源/YTD",
-        ),
-        (
-            "正式数据",
-            "2024–2026*",
-            range(2024, 2027),
-            "完整周度/月度正式数据",
-        ),
-    ]:
-        layer_years = [year for year in years if year["year"] in year_numbers]
-        layer_rows.append(
-            {
-                "layer": layer,
-                "years": label,
-                "raw": sum(year["raw"] for year in layer_years),
-                "parsed": sum(year["parsed"] for year in layer_years),
-                "description": description,
-            }
-        )
-
     calendar_rows = []
     for year in years:
-        if year["parsed"] == 0:
-            calendar_rows.append(
-                {
-                    "year": year["year"],
-                    "type": "未解析",
-                    "start": year["window_start"].isoformat(),
-                    "end": year["window_end"].isoformat(),
-                    "days": year["total_days"],
-                    "impact": "乘用车零售/新能源零售",
-                    "note": "原始 HTML 已归档；旧格式只有周度日均叙述，未生成结构化数据",
-                }
-            )
+        if year["year"] < 2022:
             continue
         for gap_start, gap_end in year["gaps"]:
-            gap_type = "官方未发布" if year["year"] == 2026 else "日历缺口"
-            if year["year"] == 2026:
-                note = (
-                    "春节前停更/发布节奏；官网无对应周报区间"
-                    if gap_start.month == 1
-                    else "春节假期/节后恢复；官网无对应周报区间"
-                )
-            elif year["year"] == 2022:
-                note = (
-                    "官网无独立周摘要；10/16 文章只有 10/8-16 与 "
-                    "10/1-16 累计，不用累计差反推"
-                )
-            else:
-                note = "官网无独立周摘要；保留缺口，不反推"
+            source_gap = KNOWN_PUBLICATION_GAPS.get((gap_start, gap_end))
             calendar_rows.append(
                 {
                     "year": year["year"],
-                    "type": gap_type,
+                    "type": "官方未发布" if source_gap else "日历缺口",
                     "start": gap_start.isoformat(),
                     "end": gap_end.isoformat(),
                     "days": (gap_end - gap_start).days + 1,
                     "impact": "乘用车零售/新能源零售",
-                    "note": note,
+                    "note": source_gap or "该日期范围缺少已解析区间",
                 }
             )
+    calendar_rows.insert(0, {
+        "year": 2022,
+        "type": "官方未发布",
+        "start": "2022-10-01",
+        "end": "2022-10-07",
+        "days": 7,
+        "impact": "独立周区间",
+        "note": "10 月全月初步统计覆盖这些日期，官网无独立周度值",
+    })
 
     nev_rows = []
     for year in parsed_years:
-        if len(year["any_nev_months"]) == 0:
+        if year["parsed"] and not year["any_nev_months"]:
             nev_rows.append(
                 {
                     "year": year["year"],
@@ -368,7 +341,7 @@ def build_summary() -> dict:
                     "end": year["window_end"].isoformat(),
                     "days": year["total_days"],
                     "impact": "新能源零售",
-                    "note": "该年旧格式摘要不发布新能源零售",
+                    "note": "旧版《车市扫描》摘要无新能源零售；独立月报可提供全月值",
                 }
             )
             continue
@@ -385,39 +358,38 @@ def build_summary() -> dict:
                     ).days
                     + 1,
                     "impact": "新能源零售",
-                    "note": "该区间有乘用车零售，但没有新能源零售速报",
+                    "note": (
+                        "《车市扫描》缺全月新能源零售；该月可查独立月报"
+                        if period["kind"] == "month" and int(period["end"][5:7]) in year["reference_months"]
+                        else "《车市扫描》该区间只有乘用车零售"
+                    ),
                 }
             )
 
     month_rows = []
     for year in parsed_years:
-        for group in group_months(year["missing_full_close"]):
-            if year["year"] == 2026 and group == [10]:
-                continue
-            group_start, group_end = month_group_dates(year["year"], group)
-            month_label = format_month_ranges(group)
-            impact = "完整月度收盘（乘用车/新能源）"
-            note = f"{month_label} 月缺少 kind=month 全月收盘；周度 MTD 不等同于全月收盘"
-            if year["year"] == 2022:
-                impact = "完整月度收盘（乘用车）"
-                note = (
-                    f"{month_label} 月只有周度 MTD；"
-                    "当前资产仅 5、9 月有完整月度收盘"
-                )
+        for month in year["missing_full_close"]:
+            month_start = date(year["year"], month, 1)
+            month_end = date(year["year"], month, calendar.monthrange(year["year"], month)[1])
+            has_reference = month in year["reference_months"]
             month_rows.append(
                 {
                     "year": year["year"],
-                    "type": "完整月度收盘缺口",
-                    "start": group_start.isoformat(),
-                    "end": group_end.isoformat(),
-                    "days": (group_end - group_start).days + 1,
-                    "impact": impact,
-                    "note": note,
+                    "type": "车市扫描月度缺口",
+                    "start": month_start.isoformat(),
+                    "end": month_end.isoformat(),
+                    "days": month_end.day,
+                    "impact": "全月数据",
+                    "note": (
+                        "独立《乘用车市场分析》已提供全月值"
+                        if has_reference else "当前年度数据无直接全月来源"
+                    ),
                 }
             )
 
     return {
         "items": items,
+        "monthly_references": monthly_references,
         "latest": latest,
         "years": years,
         "parsed_years": parsed_years,
@@ -440,7 +412,6 @@ def build_summary() -> dict:
         "calendar_total": calendar_total,
         "calendar_pct": calendar_pct,
         "calendar_gap_days": calendar_gap_days,
-        "layer_rows": layer_rows,
         "calendar_rows": calendar_rows,
         "nev_rows": nev_rows,
         "month_rows": month_rows,
@@ -465,6 +436,9 @@ def write_summary_csv(years: list[dict]) -> None:
         "完整月度收盘_乘用车",
         "完整月度收盘_新能源",
         "完整收盘缺口月份",
+        "已结束月份",
+        "独立月报数",
+        "四项核心指标齐全的全月来源数",
         "日历覆盖天数",
         "日历总天数",
         "日历覆盖率(%)",
@@ -485,15 +459,18 @@ def write_summary_csv(years: list[dict]) -> None:
                     "周度新能源零售": year["weekly_nev"],
                     "月度乘用车零售": year["monthly_retail"],
                     "月度新能源零售": year["monthly_nev"],
-                    "审计月份": len(year["audit_months"]),
+                    "审计月份": len(year["audit_months"]) if year["year"] >= 2022 else "",
                     "可覆盖月份_乘用车": len(year["any_retail_months"]),
                     "可覆盖月份_新能源": len(year["any_nev_months"]),
                     "完整月度收盘_乘用车": len(year["full_retail_months"]),
                     "完整月度收盘_新能源": len(year["full_nev_months"]),
                     "完整收盘缺口月份": missing_close_label(year),
-                    "日历覆盖天数": year["covered_days"],
-                    "日历总天数": year["total_days"],
-                    "日历覆盖率(%)": f"{year['calendar_pct']:.1f}",
+                    "已结束月份": len(year["closed_months"]),
+                    "独立月报数": len(year["reference_months"]),
+                    "四项核心指标齐全的全月来源数": len(year["complete_months"]),
+                    "日历覆盖天数": year["covered_days"] if year["year"] >= 2022 else "",
+                    "日历总天数": year["total_days"] if year["year"] >= 2022 else "",
+                    "日历覆盖率(%)": f"{year['calendar_pct']:.1f}" if year["year"] >= 2022 else "",
                 }
             )
 
@@ -521,17 +498,13 @@ def write_gap_csv(summary: dict) -> None:
 
 
 def render_html(summary: dict) -> str:
-    years = summary["years"]
-    total_parsed = summary["total_parsed"]
-    total_nev = summary["total_nev"]
-    nev_pct = total_nev / total_parsed * 100 if total_parsed else 0.0
-    month_span = summary["month_span"]
-    month_any_retail = summary["month_any_retail"]
-    month_any_nev = summary["month_any_nev"]
-    month_full_retail = summary["month_full_retail"]
-    month_full_nev = summary["month_full_nev"]
-    calendar_pct = summary["calendar_pct"]
-    calendar_gap_days = summary["calendar_gap_days"]
+    years = summary["parsed_years"]
+    latest_year = summary["latest"].year
+    complete_months = sum(len(year["complete_months"]) for year in years)
+    closed_months = sum(len(year["closed_months"]) for year in years)
+    complete_weeks = sum(year["weekly_complete"] for year in years)
+    total_weeks = sum(year["weekly"] for year in years)
+    archive_count = sum(year["raw"] for year in summary["years"] if year["year"] < 2022)
 
     def card(label: str, value: str, sub: str, accent: bool = False) -> str:
         cls = "card accent" if accent else "card"
@@ -541,58 +514,50 @@ def render_html(summary: dict) -> str:
             f'<div class="card-sub">{html.escape(sub)}</div></div>'
         )
 
+    def rate(count: int, total: int) -> str:
+        return f"{count / total * 100:.1f}".removesuffix(".0") + "%" if total else "—"
+
+    def coverage_cell(count: int, total: int) -> str:
+        percent = rate(count, total)
+        return (
+            f'<td class="coverage-cell"><strong>{percent}</strong>'
+            f'<span class="muted">{count} / {total}</span>'
+            f'<div class="bar" aria-hidden="true"><span style="width:{percent if total else "0%"}"></span></div></td>'
+        )
+
     cards = "".join(
         [
-            card("原始归档", str(summary["total_raw"]), "2020–2026 全部层级"),
             card(
-                "已解析区间",
-                str(total_parsed),
-                f"{summary['total_weekly']} 周度 · {summary['total_monthly']} 月度",
-            ),
-            card(
-                "乘用车零售",
-                f"{summary['total_retail']}/{total_parsed}",
-                "100.0% 已解析区间有值",
-            ),
-            card(
-                "新能源零售",
-                f"{total_nev}/{total_parsed}",
-                f"{nev_pct:.1f}% 已解析区间有值",
+                "月度指标覆盖",
+                rate(complete_months, closed_months),
+                f"{complete_months} / {closed_months} 个已结束月份四项齐全",
                 accent=True,
             ),
             card(
-                "月份可覆盖",
-                f"{month_any_retail}/{month_span}",
-                f"2022–2026 · 新能源 {month_any_nev}/{month_span}",
+                "周度指标覆盖",
+                rate(complete_weeks, total_weeks),
+                f"{complete_weeks} / {total_weeks} 个已入库周度区间四项齐全",
             ),
             card(
-                "解析日历覆盖",
-                f"{calendar_pct:.1f}%",
-                f"2022–2026 · 缺口 {calendar_gap_days} 天",
+                "《车市扫描》日历覆盖",
+                rate(summary["calendar_covered"], summary["calendar_total"]),
+                f"{summary['calendar_covered']} / {summary['calendar_total']} 天有统计区间覆盖",
             ),
         ]
     )
 
-    layer_rows_html = "".join(
+    coverage_rows = "".join(
         "<tr>"
-        f"<td><span class=\"pill\">{html.escape(row['layer'])}</span></td>"
-        f"<td>{html.escape(row['years'])}</td>"
-        f"<td class=\"num\">{row['raw']}</td>"
-        f"<td class=\"num\">{row['parsed']}</td>"
-        f"<td>{html.escape(row['description'])}</td>"
+        f'<th scope="row">{year["year"]}</th>'
+        f'{coverage_cell(len(year["complete_months"]), len(year["closed_months"]))}'
+        f'{coverage_cell(year["weekly_complete"], year["weekly"])}'
+        f'{coverage_cell(year["covered_days"], year["total_days"])}'
         "</tr>"
-        for row in summary["layer_rows"]
-    )
-    layer_rows_html += (
-        "<tr class=\"total\"><td>合计</td><td>2020–2026</td>"
-        f"<td class=\"num\">{summary['total_raw']}</td>"
-        f"<td class=\"num\">{summary['total_parsed']}</td>"
-        "<td>原始归档 + Legacy V2 + 正式数据</td></tr>"
+        for year in years
     )
 
     interval_rows = []
     for year in years:
-        pct = year["calendar_pct"]
         interval_rows.append(
             "<tr>"
             f"<td><strong>{year['year']}</strong><br><span class=\"muted\">{html.escape(year['layer'])}</span></td>"
@@ -604,15 +569,13 @@ def render_html(summary: dict) -> str:
             f"<td class=\"num\">{year['weekly_nev']}</td>"
             f"<td class=\"num\">{year['monthly_retail']}</td>"
             f"<td class=\"num\">{year['monthly_nev']}</td>"
-            f"<td class=\"calendar\">{year['covered_days']} / {year['total_days']}"
-            f"<div class=\"muted\">{pct:.1f}%</div>"
-            f"<div class=\"bar\"><span style=\"width:{min(pct, 100):.1f}%\"></span></div></td>"
             "</tr>"
         )
 
     month_rows = []
     for year in years:
         audit_months = len(year["audit_months"])
+        year_closed_months = len(year["closed_months"])
         missing = missing_close_label(year)
         month_rows.append(
             "<tr>"
@@ -620,9 +583,11 @@ def render_html(summary: dict) -> str:
             f"<td class=\"num\">{audit_months}</td>"
             f"<td class=\"num\">{len(year['any_retail_months'])} / {audit_months}</td>"
             f"<td class=\"num\">{len(year['any_nev_months'])} / {audit_months}</td>"
-            f"<td class=\"num\">{len(year['full_retail_months'])} / {audit_months}</td>"
-            f"<td class=\"num\">{len(year['full_nev_months'])} / {audit_months}</td>"
+            f"<td class=\"num\">{len(year['full_retail_months'])} / {year_closed_months}</td>"
+            f"<td class=\"num\">{len(year['full_nev_months'])} / {year_closed_months}</td>"
             f"<td>{html.escape(missing)}</td>"
+            f"<td class=\"num\">{len(year['reference_months'])}</td>"
+            f"<td class=\"num\">{len(year['complete_months'])} / {year_closed_months}</td>"
             "</tr>"
         )
 
@@ -681,34 +646,26 @@ def render_html(summary: dict) -> str:
       display: flex; justify-content: space-between; align-items: flex-end;
       gap: 24px; padding-bottom: 18px; border-bottom: 2px solid var(--blue);
     }
-    .eyebrow {
-      color: var(--gold); font-size: 12px; font-weight: 700;
-      letter-spacing: .14em; text-transform: uppercase; margin-bottom: 7px;
-    }
     h1 { margin: 0; color: var(--blue); font-size: 31px; line-height: 1.2; }
     .subtitle { margin: 8px 0 0; color: var(--muted); font-size: 14px; }
     .meta { color: var(--muted); font-size: 12px; text-align: right; line-height: 1.8; }
     .meta strong { color: var(--deep-blue); }
-    .lede {
-      margin: 22px 0 0; color: var(--text); font-size: 14px; line-height: 1.85;
-      max-width: 930px;
-    }
     .cards {
       display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
-      margin: 24px 0 8px;
+      margin: 22px 0 0;
     }
     .card {
       background: var(--card); border: 1px solid var(--line); border-radius: 14px;
       padding: 16px 18px 15px; box-shadow: 0 4px 18px rgba(23, 74, 124, .045);
     }
     .card.accent { border-color: rgba(215, 154, 54, .35); }
-    .card-label { color: var(--muted); font-size: 12px; letter-spacing: .03em; }
+    .card-label { color: var(--text); font-size: 13px; font-weight: 600; }
     .card-value {
-      color: var(--blue); font-size: 27px; font-weight: 700; line-height: 1.2;
+      color: var(--blue); font-size: 38px; font-weight: 700; line-height: 1.2;
       margin-top: 5px; font-variant-numeric: tabular-nums;
     }
     .card.accent .card-value { color: var(--brown); }
-    .card-sub { color: var(--muted); font-size: 12px; margin-top: 4px; }
+    .card-sub { color: var(--muted); font-size: 12px; line-height: 1.5; margin-top: 4px; }
     section { margin-top: 30px; }
     h2 { color: var(--blue); font-size: 20px; margin: 0 0 6px; }
     h3 { color: var(--deep-blue); font-size: 15px; margin: 22px 0 8px; }
@@ -717,7 +674,20 @@ def render_html(summary: dict) -> str:
       overflow-x: auto; background: var(--card); border: 1px solid var(--line);
       border-radius: 12px; box-shadow: 0 3px 14px rgba(23, 74, 124, .035);
     }
+    .table-wrap + .section-note { margin-top: 8px; }
     table { width: 100%; border-collapse: collapse; min-width: 780px; }
+    .coverage-table { min-width: 0; table-layout: fixed; }
+    .coverage-table thead th { white-space: normal; font-size: 12px; }
+    .coverage-table thead th:first-child { width: 18%; }
+    .coverage-table tbody th {
+      background: var(--card); border-top: 1px solid var(--line);
+      font-size: 15px; border-right: 1px solid var(--line);
+    }
+    .coverage-table tbody tr:nth-child(even) th { background: #FBFDFF; }
+    .coverage-cell { font-variant-numeric: tabular-nums; }
+    .coverage-cell strong {
+      color: var(--deep-blue); font-size: 16px; display: inline-block; margin-right: 8px;
+    }
     th {
       background: var(--light-blue); color: var(--deep-blue); text-align: left;
       font-size: 11.5px; font-weight: 700; padding: 10px 10px; line-height: 1.35;
@@ -728,15 +698,8 @@ def render_html(summary: dict) -> str:
       vertical-align: top; line-height: 1.55;
     }
     tr:nth-child(even) td { background: #FBFDFF; }
-    tr.total td { background: #F3F9FD; font-weight: 700; color: var(--deep-blue); }
     .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-    .calendar { min-width: 105px; font-variant-numeric: tabular-nums; }
     .muted { color: var(--muted); }
-    .pill {
-      display: inline-block; padding: 2px 8px; border-radius: 999px;
-      background: var(--light-blue); color: var(--blue); font-size: 11.5px;
-      font-weight: 600; white-space: nowrap;
-    }
     .gap-tag {
       display: inline-block; padding: 2px 7px; border-radius: 6px;
       background: var(--cream); color: var(--brown); border: 1px solid rgba(215, 154, 54, .25);
@@ -744,7 +707,7 @@ def render_html(summary: dict) -> str:
     }
     .bar {
       height: 5px; width: 100%; background: #EAF2F8; border-radius: 999px;
-      overflow: hidden; margin-top: 5px; min-width: 80px;
+      overflow: hidden; margin-top: 5px; max-width: 165px;
     }
     .bar span {
       display: block; height: 100%; border-radius: 999px;
@@ -752,6 +715,8 @@ def render_html(summary: dict) -> str:
     }
     ul.notes { margin: 6px 0 0; padding-left: 20px; color: var(--muted); font-size: 12.5px; line-height: 1.8; }
     ul.notes strong { color: var(--text); }
+    details { margin-top: 30px; padding: 12px 0; border-top: 1px solid var(--line); }
+    summary { cursor: pointer; color: var(--blue); font-weight: 700; font-size: 16px; }
     footer {
       margin-top: 34px; padding-top: 15px; border-top: 1px solid var(--line);
       color: var(--muted); font-size: 11.5px; line-height: 1.8;
@@ -760,11 +725,16 @@ def render_html(summary: dict) -> str:
       .wrap { padding: 24px 16px 36px; }
       header { display: block; }
       .meta { text-align: left; margin-top: 12px; }
-      .cards { grid-template-columns: repeat(2, 1fr); }
       h1 { font-size: 25px; }
     }
     @media (max-width: 560px) {
-      .cards { grid-template-columns: 1fr; }
+      .cards { gap: 6px; }
+      .card { padding: 10px 7px; border-radius: 9px; }
+      .card-value { font-size: clamp(21px, 5.8vw, 30px); }
+      .card-label, .card-sub { font-size: 11px; }
+      .coverage-table td, .coverage-table th { padding: 8px 6px; }
+      .coverage-table thead th { font-size: 11px; }
+      .coverage-cell strong { display: block; margin-right: 0; }
     }
     """
 
@@ -774,74 +744,38 @@ def render_html(summary: dict) -> str:
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
-<title>CPCA 历史数据覆盖率审计</title>
+<title>CPCA 2022 年起数据覆盖率审计</title>
 <style>{css}</style>
 </head>
 <body>
 <div class="wrap">
 <header>
   <div>
-    <div class="eyebrow">CPCA · 数据资产审计</div>
-    <h1>历史数据覆盖率审计</h1>
-    <p class="subtitle">2020–2026 · 周度区间、月度收盘与指标可用性</p>
+    <h1>CPCA 2022 年起数据覆盖率</h1>
+    <p class="subtitle">2022–{latest_year} 年度审计</p>
   </div>
   <div class="meta">审计截止 <strong>{latest}</strong><br>生成日期 {generated}</div>
 </header>
 
-<p class="lede">
-所有已解析区间中，乘用车零售覆盖 {summary['total_retail']}/{total_parsed}，
-新能源零售覆盖 {total_nev}/{total_parsed}。2022–2026 已发生的 {month_span} 个月中，
-{month_any_retail} 个月至少有乘用车零售区间，{month_any_nev} 个月至少有新能源零售区间；
-若要求完整月度收盘，则分别为 {month_full_retail} 和 {month_full_nev} 个月。
-2020–2021 目前只有原始 HTML，没有结构化数据。
-</p>
+<div class="cards">{cards}</div>
 
 <section>
-  <div class="cards">{cards}</div>
-</section>
-
-<section>
-  <h2>资产分层</h2>
-  <p class="section-note">按数据层级看原始文章与已解析区间；原始文章按统计周截止年归属，和解析区间不完全一一对应。</p>
+  <h2>各年覆盖率</h2>
+  <p class="section-note">四项指标为乘用车和新能源的零售、批发。月度按已结束月份统计，含独立月报。周度按已入库的周度区间统计。</p>
   <div class="table-wrap">
-    <table>
-      <thead><tr><th>层级</th><th>覆盖年份</th><th>原始文章</th><th>已解析区间</th><th>说明</th></tr></thead>
-      <tbody>{layer_rows_html}</tbody>
-    </table>
-  </div>
-  <p class="section-note">* 2026 年截至 {latest}。2022–2023 的原始文章与解析区间差异来自同 period 旧版去重和一篇文章拆分多个区间。</p>
-</section>
-
-<section>
-  <h2>年度区间覆盖</h2>
-  <p class="section-note">周度区间 = <code>kind=month_to_date</code>；月度收盘 = <code>kind=month</code>。周度是 CPCA 官方发布区间，不保证 7 天。</p>
-  <div class="table-wrap">
-    <table>
+    <table class="coverage-table">
       <thead>
         <tr>
-          <th>年份 / 层级</th><th>原始文章</th><th>已解析区间</th><th>周度区间</th><th>月度收盘</th>
-          <th>周度<br>乘用车</th><th>周度<br>新能源</th><th>月度<br>乘用车</th><th>月度<br>新能源</th><th>日历覆盖</th>
+          <th scope="col">年份</th>
+          <th scope="col">月度四项齐全</th>
+          <th scope="col">周度四项齐全</th>
+          <th scope="col">日历覆盖</th>
         </tr>
       </thead>
-      <tbody>{''.join(interval_rows)}</tbody>
+      <tbody>{coverage_rows}</tbody>
     </table>
   </div>
-</section>
-
-<section>
-  <h2>年度月份覆盖</h2>
-  <p class="section-note">“可覆盖月份”表示该月至少有一个区间（含周度 MTD）带有该指标；“完整月度收盘”严格要求该月有 <code>kind=month</code> 记录。2026 年按截至 {latest} 的 10 个月计算。</p>
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>年份</th><th>审计月份</th><th>可覆盖<br>乘用车</th><th>可覆盖<br>新能源</th>
-          <th>完整收盘<br>乘用车</th><th>完整收盘<br>新能源</th><th>完整收盘缺口月份</th>
-        </tr>
-      </thead>
-      <tbody>{''.join(month_rows)}</tbody>
-    </table>
-  </div>
+  <p class="section-note">日历覆盖取《车市扫描》周度和全月区间的日期并集。全月区间可以覆盖缺少独立周报的日期。</p>
 </section>
 
 <section>
@@ -855,7 +789,7 @@ def render_html(summary: dict) -> str:
   </div>
 
   <h3>指标与月度收盘缺口</h3>
-  <p class="section-note">完整月度收盘缺口按当前已入库资产统计；2022 旧格式文章中的部分月末累计表述尚未入库，不计入覆盖。</p>
+  <p class="section-note">按《车市扫描》列出周度指标和全月缺口。独立月报的数值可以在年度数据中查阅，保留独立来源及发布口径。</p>
   <div class="table-wrap">
     <table>
       <thead><tr><th>年份</th><th>类型</th><th>区间</th><th>天数</th><th>影响指标</th><th>说明</th></tr></thead>
@@ -864,21 +798,51 @@ def render_html(summary: dict) -> str:
   </div>
 </section>
 
+<details>
+  <summary>年度区间与月份明细</summary>
+  <h3>来源文章与区间数</h3>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>年份 / 层级</th><th>原始文章</th><th>已解析区间</th><th>周度区间</th><th>月度收盘</th>
+          <th>周度<br>乘用车</th><th>周度<br>新能源</th><th>月度<br>乘用车</th><th>月度<br>新能源</th>
+        </tr>
+      </thead>
+      <tbody>{''.join(interval_rows)}</tbody>
+    </table>
+  </div>
+
+  <h3>月份与独立月报</h3>
+  <p class="section-note">有数据月份含当月未结束的周度区间。全月统计只计算已结束月份。四项齐全要求同一来源报告同时给出乘用车及新能源零售、批发，包含独立《乘用车市场分析》。</p>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>年份</th><th>审计月份</th><th>可覆盖<br>乘用车</th><th>可覆盖<br>新能源</th>
+          <th>车市扫描全月<br>乘用车</th><th>车市扫描全月<br>新能源</th><th>车市扫描全月缺口</th>
+          <th>独立月报数</th><th>四项齐全<br>已结束月份</th>
+        </tr>
+      </thead>
+      <tbody>{''.join(month_rows)}</tbody>
+    </table>
+  </div>
+</details>
+
 <section>
   <h2>口径说明</h2>
   <ul class="notes">
     <li><strong>周度区间</strong>是 CPCA 官方发布统计区间，不保证 7 天；不补官网未发布的自然周。</li>
     <li><strong>月份可覆盖</strong>只表示该月有任意部分区间数据，不等于有完整月度总量；<strong>完整月度收盘</strong>才表示该月有全月口径数据。</li>
-    <li><strong>日历覆盖</strong>按所有已解析区间的日期并集计算；2026 年按 1 月 1 日至 {latest} 计算。</li>
-    <li>2020–2021 只有原始 HTML 归档，没有进入 `data/*.json` 或 `data/legacy/*.json`，因此按未解析处理。</li>
     <li>缺口只记录，不补数、不插值、不从累计值反推缺失周。</li>
     <li>本报告只审计已入库数据，原始 HTML 中存在但尚未解析的叙述不计入覆盖。</li>
   </ul>
 </section>
 
 <footer>
+  2020–2021 年保留 {archive_count} 篇原始 HTML，仅归档。<br>
   数据来源：CPCA（乘联会） · 审计脚本：scripts/coverage_audit.py<br>
-  输出：data/coverage_audit.csv、data/coverage_gaps.csv · 本报告为离线单文件 HTML
+  输出：data/coverage_audit.csv、data/coverage_gaps.csv、data/annual/YYYY.json · 本报告为离线单文件 HTML
 </footer>
 </div>
 </body>
@@ -891,6 +855,7 @@ def main() -> int:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     write_summary_csv(summary["years"])
     write_gap_csv(summary)
+    write_annual_exports(summary)
     REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
     REPORT_PATH.write_text(render_html(summary), encoding="utf-8")
 

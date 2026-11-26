@@ -427,7 +427,7 @@ def main() -> int:
             f"{latest['period']['end']}. Run python3 scripts/build_standard_dataset.py first."
         )
 
-    document = render_html(latest, rows)
+    document = "\n".join(line.rstrip() for line in render_html(latest, rows).splitlines()) + "\n"
     out_path = Path(args.out) if args.out else Path("reports") / f"{latest['period']['end']}.html"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(document, encoding="utf-8")

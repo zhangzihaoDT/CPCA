@@ -166,7 +166,17 @@ def extract_overview(html: str) -> str:
     if not cut:
         cut = re.search(r"\n\s*1[.．]", body)
     if cut:
-        body = body[: cut.start()]
+        intro = body[: cut.start()]
+        if intro.strip("：: \t\r\n"):
+            body = intro
+        else:
+            # The 2024-01-07 article puts the two summary lines inside section 1.
+            summary = re.search(
+                r"(?m)^[ \t]*(乘用车：[^\n]+)\n[ \t]*(新能源：[^\n]+)", body
+            )
+            if not summary:
+                raise ValueError("overview block is empty")
+            body = " ".join(summary.groups())
     body = re.sub(r"\s+", " ", body).strip()
     # Some articles contain malformed thousands separators such as
     # "1.939.5万辆" (should be "1,939.5万辆").
@@ -222,6 +232,9 @@ def main() -> int:
     parser.add_argument("--delay", type=float, default=2.0, help="Delay between requests")
     parser.add_argument("--max-pages", type=int, default=17, help="Maximum list pages")
     parser.add_argument("--dry-run", action="store_true", help="List articles only")
+    parser.add_argument(
+        "--refresh-list", action="store_true", help="Refresh list pages and reuse cached articles"
+    )
     parser.add_argument("--force", action="store_true", help="Refetch cached articles")
     parser.add_argument("--clean", action="store_true", help="Remove old blocks before writing")
     args = parser.parse_args()
@@ -255,7 +268,7 @@ def main() -> int:
     while page <= args.max_pages:
         list_url = LIST_URL.format(page=page)
         list_cache = RAW_DIR / f"list_page_{page}.html"
-        if list_cache.exists() and not args.force:
+        if list_cache.exists() and not (args.force or args.refresh_list):
             html = list_cache.read_text(encoding="utf-8", errors="replace")
         else:
             data, html = fetch_html(list_url, BASE_URL + "/", args.delay)

@@ -216,6 +216,25 @@ def parse_legacy_block_multi(
     return result
 
 
+def parse_legacy_month_close(block: str, end: date, published_date: date) -> dict | None:
+    """Read a separately reported full month in a legacy month-end block."""
+    if end.day != calendar.monthrange(end.year, end.month)[1]:
+        return None
+    match = re.search(
+        rf"初步(统计|预估)[，：:]\s*{end.month}月"
+        rf"(?:\s*1\s*日?\s*-\s*{end.day}日)?(?=\s*[，,全乘])",
+        block,
+    )
+    if not match:
+        return None
+    text = re.split(r"初步(?:统计|预估)[，：:]", block[match.end() :], maxsplit=1)[0]
+    dataset = parse_legacy_block(f"{end.month}月1-{end.day}日，{text.lstrip(' ，,')}", published_date)
+    if not all(dataset["metrics"][key] for key in ("passenger_retail", "passenger_wholesale")):
+        raise ValueError(f"Incomplete passenger metrics for legacy month close: {end}")
+    dataset["notes"].append({"type": "month_close", "text": f"原文明确发布的全月初步{match[1]}。"})
+    return dataset
+
+
 def parse_legacy_block(block: str, published_date: date) -> dict:
     period_match = PERIOD_RE.search(block)
     if not period_match:
