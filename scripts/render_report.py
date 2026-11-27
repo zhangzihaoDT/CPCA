@@ -374,7 +374,7 @@ h1 {{
 <main class="brief">
   <header class="brief-header">
     <div class="header-row">
-      <div class="eyebrow">CPCA WEEKLY · 乘联会周度数据</div>
+      <div class="eyebrow">CPCA Weekly Report</div>
       <div class="brand">CPCA</div>
     </div>
     <h1>全国乘用车市场<br>零售简报</h1>
